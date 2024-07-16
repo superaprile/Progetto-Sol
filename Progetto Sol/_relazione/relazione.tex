@@ -1,0 +1,194 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{titling}
+\usepackage[%  
+    pdfborder={0 0 0},
+    linkcolor=black
+]{hyperref}
+\graphicspath{ {./images/} }
+\setlength{\parindent}{0em}
+
+\title{Relazione Progetto SOL}
+\date{a.a 2022/23}
+\author{Aprile Filippo\\ Corso A \\ 580175}
+
+\pretitle{\begin{center}\LARGE\includegraphics[width=10cm]{images/logo.jpg}\\}
+    \posttitle{\end{center}}
+    
+\begin{document}
+\maketitle
+\tableofcontents
+
+\section{Introduzione}
+
+Il codice sorgente per l'implementazione di \textbf{\textit{farm}} è stato suddiviso nelle seguenti folder:
+\begin{itemize}
+    \itemsep 0em
+    \item \textbf{collector}, contenente il codice per l'implementazione del Colletor.
+    \item \textbf{core}, contente il codice per l'implementazione delle funzionalità condivise da Master e Collector.
+    \item \textbf{master}, contenente il codice per l'implementazione del Master.
+\end{itemize}
+
+Queste folder sono a loro volta suddivise in:
+\begin{itemize}
+    \itemsep 0em
+    \item \textbf{include}, contenente i file header utilizzati.
+    \item \textbf{src}, contenente i file.c utilizzati.
+\end{itemize}
+
+Inoltre è presente un folder \textbf{\textit{build}}, contenente:
+\begin{itemize}
+    \itemsep 0em
+    \item \textbf{objs}, folder dove vengono salvati i file.o del progetto.
+    \item \textbf{generafile.c}, file.c per la generazione dei file binari (fornito con il testo).
+    \item \textbf{test.sh}, script bash per testare il progetto (fornito con il testo).
+    \item \textbf{testSignal.sh}, script bash per il test dei segnali da gestire nel progetto. Per ogni segnale viene eseguita \textbf{\textit{farm}} a cui vengono passati valori diversi per gli argomenti opzionali: -t, -n e -q, oltre a -d testdir/ e i file.dat. Dopo un secondo viene mandato il segnale da gestire e viene controllato il valore di exit: 0 (test passato), altimenti (test fallito).
+\end{itemize}
+
+Infine è presente un \textbf{\textit{Makefile}}, per la compilzazione e il testing del progetto.
+
+\subsection{Makefile}
+Il \textbf{\textit{Makefile}} prevede i seguenti target:
+
+\begin{itemize}
+    \itemsep 0em
+    \item \textbf{farm}: compila l'intero progetto generando l'eseguibile \textbf{\textit{farm}}.
+    \item \textbf{generaFile}: compila generafile.c generando l'eseguibile \textbf{\textit{generafile}}.
+    \item \textbf{test}: esegue i test definiti in \textbf{\textit{test.sh}}.
+    \item \textbf{testSignal}: esegue i test definiti in \textbf{\textit{testSignal.sh}}.
+    \item \textbf{cleanProject}: rimuove tutti i file.o presenti in \textbf{\textit{build/objs}} e rimuove l'eseguibile \textbf{\textit{farm}}.
+    \item \textbf{cleanFile}: rimuove tutti i file.dat, \textbf{\textit{testdir/}} e l'eseguibile \textbf{\textit{generafile}}.
+    \item \textbf{cleanAll}: esegue \textbf{\textit{make cleanProject}} e \textbf{\textit{make cleanFile}}.
+\end{itemize}
+
+\section{Implementazione del progetto}
+
+Il codice per l'implementazione del Master e' suddiviso nei seguenti file presenti in \textbf{\textit{master/src}}:
+
+\begin{itemize}
+    \itemsep 0em
+    \item \textbf{master\_config.c}: si occupa della lettura degli argomenti passati da linea di comando.
+    \item \textbf{master\_farm.c}: crea la threadPool, setta la nuova gestione dei segnali, esegue la produzione dei task e aspetta la terminazione della threadPool.
+    \item \textbf{master\_task\_producer.c}: definisce i metodi per la produzione dei task.
+    \item \textbf{master\_task\_handler.c}: definisce le lock, variabili di condizione e metodi per l'uso della coda concorrente.
+    \item \textbf{master\_task\_worker.c}: definisce il comportamento dei thread worker, i quali hanno il compito di elaborare il risultato dei file binari.
+\end{itemize}
+
+Per quanto riguarda le  funzionalità condivise tra Master e Collector, il codice per l'implementazione si trova nei file presenti in \textbf{\textit{core/src}}:
+
+\begin{itemize}
+    \itemsep 0em
+    \item \textbf{queue\_utils.c}: definisce i metodi per la creazione e uso di un coda generica (void*).
+    \item \textbf{signal\_handler.c}: definisce le varibile globali e i metodi per la gestione dei segnali tramite sigaction.
+    \item \textbf{socket\_handler.c}: definisce i metodi per la creazione e la gestione della socket AF\_UNIX.
+    \item \textbf{utils\_.c}: definisce macro e metodi per gestione degli errori, controlli, readn e writen.
+\end{itemize}
+
+Viene inoltre utilizzato il \textit{\textbf{pthread\_utils.h}} contenente macro per gestione degli errori a seguito di: lock, unlock, signal, wait, join e broadcast.\newline\newline
+Per l'implemtazione del Collector è stato usato solamente il file \textbf{collector.c} presente in \textbf{\textit{collector/src}}.\newline
+
+Per ognuno di questi file è presente un file header in: \textbf{\textit{master/include}} (Master), \textbf{\textit{core/include}} (Core), \textbf{\textit{collector/include}} (Collector), che contiene le signature dei metodi, macro e eventuali varibili globali da essi definiti in modo da poter essere utilizzati dagli altri file.c.
+\newline\newline
+Il file \textbf{master.c} è il \textbf{main.c} del Progetto.
+
+\subsection{Gestione degli argomenti}
+Gli argomenti possono essere:
+\begin{itemize}
+    \itemsep 0em
+    \item \textbf{opzionali}: letti mediante utilizzo di getopt(), salvati in variabili globali definite extern nel \textbf{master\_config.h} e inizializzati ai valori di default in \textbf{master\_config.c}. Vengono effettuati i seguenti controlli:
+          \subitem \textbf{-q, -n}, viene controllato che l' argomento sia un numero $ > $ 0.
+          \subitem \textbf{-t}, viene controllato che l' argomento sia un numero $ \ge $ 0.
+          \subitem \textbf{-d}, viene controllato che l'argomento sia il path di una dir.
+    \item \textbf{file binari}: vengono controllati nel \textbf{master\_producer.c}, in caso di file non binario oppure file non esistente, il file viene ignorato. Lo stesso avviene per i file contenuti nella folder passata come argomento dell' opzione-d. Il controllo viene fatto nel \textbf{master\_producer.c} al fine di ridurre la complessita' in tempo/spazio iterando una sola volta gli argomenti e non creando altre stutture in memoria per la lore gestione oltre la coda concorrente.
+\end{itemize}
+
+Se non viene passata l'opzione -d e non viene passato nessun file binario come argomento oppure i controllo falliscono, il programma termina con fallimento.
+
+\subsection{Calcolo risultati dei file binari}
+Per il calcolo dei risultati dei file binari viene creata una threadPool e viene utilizzata una coda concorrente (politica LIFO) definita in \textbf{\textit{master\_task\_handler.c}}, implementado il paradigma del \textbf{produttore/consumatore}.
+La coda concorrente viene inzializzata prima della creazione della threadPool, con il flag settato a 1 (aperta), in modo che i thread worker si mettino in attesa del producer sulla \textbf{condition variable empty}.
+\subsubsection{Producer}
+Il main thead del processo Master si occupa di:
+\begin{itemize}
+    \itemsep 0em
+    \item \textit{iterare la folder dell' opzione -d (in caso venga passata)},
+    \item \textit{eseguire la push dei path relativi dei file binari presenti e di quelli passati come argomento sulla coda concorrente},
+    \item \textit{chiude la coda concorrente per sengalare la fine della produzione}.
+\end{itemize}
+Per eseguire le \textbf{push} sulla coda concorrente:
+\begin{itemize}
+    \itemsep 0em
+    \item \textit{aquisisce la lock sulla coda concorrente},
+    \item \textit{itera finché la coda risulta piena, eseguendo una \textbf{wait} sulla \textbf{condition variable full} della lock (definita in \textbf{\textit{master\_task\_handler.c}}), in attesa che un worker esegua una pop sulla coda concorrente},
+    \item \textit{esegue la \textbf{push} del path relativo del file sulla coda, effettua una \textbf{signal} sulla \textbf{condition variable empty} della lock (definita in \textbf{\textit{master\_task\_handler.c}}) per risvegliare i thread worker in attesa e rilascia la lock sulla coda concorrente.}
+\end{itemize}
+
+Conclude con la \textbf{close} della coda concorrente:
+\begin{itemize}
+    \itemsep 0em
+    \item \textit{setta il flag della coda a 0 (chiusa) (aquisendone e rilasciandone la lock)},
+    \item \textit{esegue una broadcast sulla condition variable empty per segnalare thread worker in attesa di terminare (aquisendone e rilasciandone la lock)}.
+\end{itemize}
+
+\subsubsection{Worker}
+I thread worker si occupano di:
+\begin{itemize}
+    \itemsep 0em
+    \item \textit{eseguire la pop dei path relaviti dei file dalla coda concorrente finche' non riceve NULL},
+    \item \textit{calcolarne il risultato},
+    \item \textit{inviare il path relativo dei file e i loro risultati al processo Collector}.
+\end{itemize}
+Per eseguire le \textbf{pop} dalla coda concorrente, il thread Worker:
+\begin{itemize}
+    \itemsep 0em
+    \item \textit{aquisisce la lock sulla coda concorrente},
+    \item \textit{itera finche' la coda risulta vuota e aperta, eseguendo una \textbf{wait} sulla \textbf{condition variable empty} della lock (definita in \textbf{\textit{master\_task\_handler.c}}), in attesa che il producer esegua una push sulla coda concorrente},
+    \item \textit{controlla lunghezza e stato della coda concorrente (aperta/chiusa):}
+          \subitem \textit{\textbf{coda concorrente vuota e chiusa}, rilascia la lock sulla coda e restituisce NULL.}
+          \subitem \textit{\textbf{altrimenti}, esegue la \textbf{pop} del path relativo del file dalla coda, effettua una \textbf{signal} sulla \textbf{condition variable full} della lock (definita in \textbf{\textit{master\_task\_handler.c}}) per risvegliare il producer in attesa e rilascia la lock sulla coda concorrente.}
+\end{itemize}
+
+\subsection{Comunicazione con il processo Collector}
+Per la comunicazione tra il processo Master e il processo Collector, entrambi creano \textbf{una socket AF\_UNIX}.\newline\newline
+\textbf{Il processo Master fa da client della socket}, connettendosi e inviando i risultati tramite i thread Worker mediante 2 scritture per ogni file: con la prima viene scritta la size del buffer e con la seconda viene scritto il buffer, così strutturato:
+\begin{itemize}
+    \itemsep 0em
+    \item \textbf{risultato del file}, long (8 bytes),
+    \item \textbf{lunghezza path relativo del file}, size\_t (8 bytes),
+    \item \textbf{path relativo del file}, lunghezza path relativo del file bytes.
+\end{itemize}
+
+Per la gestione della concorrenza viene usata una lock sula socket, la quale viene acquisita precedentemente alla prima scrittura e rilasciata dopo la seconda. Una volta che il processo Master ha terminato chiude la socket.\newline\newline
+\textbf{Il processo Collector assume il ruolo di master della socket}, mettondosi in attesa della connessione da parte del processo Master. Una volta avvenuta la connessione legge i risultati inviati dai thread Worker di quest'ultimo, li salva in una struct Data definita in \textit{\textbf{collector.h}} e li inserisce in un coda in modo ordinato. La lettura dei risultati termina quando la read restituisce 0, ovvero il processo Master ha chiuso la socket (nessun scrittore sulla connessione). Terminata la lettura dei risultati il Collector chiude la socket, chiude il descrittore del processo Master, rimuove la socket tramite l'unlink e stampa i path relativi dei file ed i loro risultati in modo ordinato.\newline\newline
+Le \textit{scritture/letture sulla socket} vengono effettuate utilizzando le funioni \textbf{readn/writen} fornite a lezione al fine di evitare \textit{scritture/letture parziali.}
+\subsection{Gestione dei segnali}
+I segnali: SIGHUP, SIGTERM, SIGQUIT, SIGINT, SIGPIPE, SIGUSR1 vengono bloccati prima della creazione del processo Collector e della threadPool in modo che, per ereditarieta, rimangano bloccati in entrambi. Una volta creato il processo Collector e la threadPool, il main thread del processo Master ridefinisce la funzione di handler per ognuno di essi tramite sigaction e, in seguito, li sblocca (per far si che vengano gestiti unicamente da lui). Le funzioni di handler vengono ridefinite nel seguente modo:
+\begin{itemize}
+    \itemsep 0em
+    \item \textbf{SIGTERM, SIGQUIT, SIGINT, SIGHUP, SIGUSR1}, setta la variabile \textit{volatile sig\_atomic\_t} signalFlag, definita in \textit{\textbf{signal\_handler.c}}, al valore del segnale ricevuto.
+    \item \textbf{SIGPIPE}, ignorato.
+\end{itemize}
+Il controllo della ricezione dei segnali viene fatto dal main thread del processo Master ogni volta che deve eseguire una push sulla coda concorrente. Vi sono 3 casi:
+\begin{itemize}
+    \itemsep 0em
+    \item \textbf{nessun segnale ricevuto (signalFlag = 0) }, viene eseguita la \textbf{push} sulla coda concorrente.
+    \item \textbf{segnale SIGUSR1 ricevuto (signalFlag = SIGUSR1) }, viene fatta un scrittura sulla socket di "STAMPA" dal main thread, resettato il signalFlag a 0 e fatta la \textbf{push} sulla coda concorrente. Ogni volta che il processo Collector legge un risultato dalla socket controlla se ha ricevuto il messaggio "STAMPA" e in caso stampa i path relativi dei file e il loro risultati fino a quel momento ricevuti in modo ordinato.
+    \item \textbf{segnale di terminazione ricevuto (signalFlag = SIGTERM, SIGQUIT, SIGINT, SIGHUP) }, viene eseguita la \textbf{close} della coda concorrente, e si ha la terminazione safe del programma.
+\end{itemize}
+
+La ricezione dei segnali comporta la terminazione di un eventuale sleep da parte del main thread. Per far si che una volta ricevuto un SIGUSR1, il segnale venga gestito correttamente e venga completata la sleep rimanente, il main thread itera fino a che la sleep rimanete non è = 0. In caso la sleep venga interrotta, controlla il segnale ricevuto:
+\begin{itemize}
+    \itemsep 0em
+    \item \textbf{segnale SIGUSR1 ricevuto (signalFlag = SIGUSR1) }, esegue un scrittura sulla socket di "STAMPA" e resetta il signalFlag a 0.
+    \item \textbf{segnale di terminazione ricevuto (signalFlag = SIGTERM, SIGQUIT, SIGINT, SIGHUP) }, viene eseguita la \textbf{close} della coda concorrente, e si ha la terminazione safe del programma.
+    \item \textbf{infine setta la sleep rimanente al nuovo valore.}
+\end{itemize}
+
+È stata preferita la gestione dei segnali tramite sigaction rispetto a quella tramite sigwait, in quanto quest'ultima sembra confarsi maggiormente alle situazioni in cui si devono gestire i segnali di un server(o un qualsiasi programma che debba loopare "indeterminatamente" soddisfando richieste) prevedendo l'uso di un thread apposito per la loro gestione, che in questo caso andrebbe terminato esplicitamente una volta che il processo Master completa la produzione dei task. Inoltre e' stato deciso di bloccare i segnali prima della creazione del processo Collector e della threadPool in modo da sfruttare l'ereditarieta' della signal mask al costo di ignorarli fino al loro sblocco, a seguito del setup dei loro signal handler.
+
+
+
+
+\end{document}
+
